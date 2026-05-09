@@ -7,3 +7,4 @@ dist/
 .env
 *.pyc
 .vscode/
+backend/uploads/
