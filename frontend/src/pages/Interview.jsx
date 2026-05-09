@@ -1,102 +1,84 @@
-import { useEffect, useRef, useState } from "react"
-import { motion } from "framer-motion"
+import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 
 import {
-    ChevronLeft,
-    ChevronRight,
-    Mic,
-    Square,
-    Clock3,
-    Code2,
-    Volume2,
-} from "lucide-react"
+  ChevronLeft,
+  ChevronRight,
+  Mic,
+  Square,
+  Clock3,
+  Code2,
+  Volume2,
+} from "lucide-react";
 
-import { useNavigate } from "react-router-dom"
+import { useNavigate } from "react-router-dom";
 
-import Editor from "@monaco-editor/react"
+import Editor from "@monaco-editor/react";
 
-import API from "../services/api"
+import API from "../services/api";
 
-import Background from "../components/Background"
+import Background from "../components/Background";
 
 function Interview() {
+  const navigate = useNavigate();
 
-    const navigate = useNavigate()
+  const mediaRecorderRef = useRef(null);
 
-    const mediaRecorderRef = useRef(null)
+  const audioChunksRef = useRef([]);
 
-    const audioChunksRef = useRef([])
+  // -----------------------------------
+  // STATES
+  // -----------------------------------
 
-    // -----------------------------------
-    // STATES
-    // -----------------------------------
+  const [questions, setQuestions] = useState([]);
 
-    const [questions, setQuestions] =
-        useState([])
+  const [answers, setAnswers] = useState({});
 
-    const [answers, setAnswers] =
-        useState({})
+  const [currentQuestion, setCurrentQuestion] = useState(0);
 
-    const [currentQuestion, setCurrentQuestion] =
-        useState(0)
+  const [answer, setAnswer] = useState("");
 
-    const [answer, setAnswer] =
-        useState("")
+  const [loading, setLoading] = useState(true);
 
-    const [loading, setLoading] =
-        useState(true)
+  const [recording, setRecording] = useState(false);
 
-    const [recording, setRecording] =
-        useState(false)
+  const [transcribing, setTranscribing] = useState(false);
 
-    const [transcribing, setTranscribing] =
-        useState(false)
+  const [submitting, setSubmitting] = useState(false);
 
-    const [submitting, setSubmitting] =
-        useState(false)
+  const [selectedLanguage, setSelectedLanguage] = useState("python");
 
-    const [selectedLanguage, setSelectedLanguage] =
-        useState("python")
+  const [voiceMode, setVoiceMode] = useState("replace");
 
-    const [voiceMode, setVoiceMode] =
-        useState("replace")
+  // -----------------------------------
+  // QUESTION TIMERS
+  // -----------------------------------
 
-    // -----------------------------------
-    // QUESTION TIMERS
-    // -----------------------------------
+  const [questionTimers, setQuestionTimers] = useState({});
 
-    const [questionTimers, setQuestionTimers] =
-        useState({})
+  const [lockedQuestions, setLockedQuestions] = useState({});
 
-    const [lockedQuestions, setLockedQuestions] =
-        useState({})
+  const session_id = localStorage.getItem("session_id");
 
-    const session_id =
-        localStorage.getItem("session_id")
+  // -----------------------------------
+  // CODE BOILERPLATES
+  // -----------------------------------
 
-    // -----------------------------------
-    // CODE BOILERPLATES
-    // -----------------------------------
-
-    const boilerplates = {
-
-        python:
-            `# Write your Python solution here
+  const boilerplates = {
+    python: `# Write your Python solution here
 
 def solve():
     pass
 `,
 
-        javascript:
-            `// Write your JavaScript solution here
+    javascript: `// Write your JavaScript solution here
 
 function solve() {
 
 }
 `,
 
-        cpp:
-            `// Write your C++ solution here
+    cpp: `// Write your C++ solution here
 
 #include <iostream>
 using namespace std;
@@ -107,8 +89,7 @@ int main() {
 }
 `,
 
-        java:
-            `// Write your Java solution here
+    java: `// Write your Java solution here
 
 public class Main {
 
@@ -116,598 +97,427 @@ public class Main {
 
     }
 }
-`
+`,
+  };
+
+  // -----------------------------------
+  // FETCH SESSION
+  // -----------------------------------
+
+  useEffect(() => {
+    fetchSession();
+  }, []);
+
+  const fetchSession = async () => {
+    try {
+      const response = await API.get(`/questions/session/${session_id}`);
+
+      const fetchedQuestions = response.data.questions || [];
+
+      setQuestions(fetchedQuestions);
+
+      // -----------------------------------
+      // INITIALIZE TIMERS
+      // -----------------------------------
+
+      const timers = {};
+
+      fetchedQuestions.forEach((_, index) => {
+        if (index < 2) {
+          timers[index] = 1800;
+        } else {
+          timers[index] = 300;
+        }
+      });
+
+      setQuestionTimers(timers);
+
+      const fetchedAnswers = response.data.answers || {};
+
+      setAnswers(fetchedAnswers);
+
+      const index = response.data.current_question || 0;
+
+      setCurrentQuestion(index);
+
+      const savedAnswer = fetchedAnswers[index];
+
+      if (savedAnswer) {
+        setAnswer(savedAnswer);
+      } else {
+        if (index < 2) {
+          setAnswer(boilerplates.python);
+        } else {
+          setAnswer("");
+        }
+      }
+    } catch (error) {
+      console.log(error);
     }
 
-    // -----------------------------------
-    // FETCH SESSION
-    // -----------------------------------
+    setLoading(false);
+  };
 
-    useEffect(() => {
+  // -----------------------------------
+  // CURRENT QUESTION
+  // -----------------------------------
 
-        fetchSession()
+  const currentQuestionText = questions[currentQuestion] || "";
 
-    }, [])
+  const cleanQuestion = currentQuestionText.replace(/^\d+\.\s*/, "");
 
-    const fetchSession = async () => {
+  const isCodingQuestion = currentQuestion < 2;
+
+  // -----------------------------------
+  // CURRENT TIMER
+  // -----------------------------------
+
+  const timeLeft = questionTimers[currentQuestion] || 0;
+
+  const isLocked = lockedQuestions[currentQuestion] || false;
+
+  // -----------------------------------
+  // PER QUESTION TIMER
+  // -----------------------------------
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (isLocked) return;
+
+    const timer = setInterval(() => {
+      setQuestionTimers((prev) => {
+        const current = prev[currentQuestion];
+
+        if (current <= 1) {
+          setLockedQuestions((old) => ({
+            ...old,
+
+            [currentQuestion]: true,
+          }));
+
+          clearInterval(timer);
+
+          const updated = {
+            ...prev,
+
+            [currentQuestion]: 0,
+          };
+
+          if (
+            currentQuestion < questions.length - 1 &&
+            updated[currentQuestion + 1] === undefined
+          ) {
+            updated[currentQuestion + 1] = 30;
+          }
+
+          return updated;
+        }
+
+        return {
+          ...prev,
+
+          [currentQuestion]: current - 1,
+        };
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [currentQuestion, isLocked, loading, questions.length]);
+
+  // -----------------------------------
+  // FORMAT TIMER
+  // -----------------------------------
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+
+    const secs = seconds % 60;
+
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
+  // -----------------------------------
+  // AUTO SPEAK
+  // -----------------------------------
+
+  useEffect(() => {
+    if (!cleanQuestion) return;
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(cleanQuestion);
+
+    window.speechSynthesis.speak(utterance);
+  }, [currentQuestion]);
+
+  // -----------------------------------
+  // REPLAY QUESTION
+  // -----------------------------------
+
+  const replayQuestion = () => {
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(cleanQuestion);
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // -----------------------------------
+  // SAVE ANSWER
+  // -----------------------------------
+
+  const saveAnswer = async () => {
+    try {
+      await API.post("/questions/save-answer", {
+        session_id,
+
+        question_index: currentQuestion,
+
+        answer,
+      });
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // -----------------------------------
+  // NEXT QUESTION
+  // -----------------------------------
+
+  const nextQuestion = async () => {
+    await saveAnswer();
+
+    const updatedAnswers = {
+      ...answers,
+
+      [currentQuestion]: answer,
+    };
+
+    setAnswers(updatedAnswers);
+
+    if (currentQuestion < questions.length - 1) {
+      const nextIndex = currentQuestion + 1;
+
+      setCurrentQuestion(nextIndex);
+
+      const nextAnswer = updatedAnswers[nextIndex];
+
+      if (nextAnswer) {
+        setAnswer(nextAnswer);
+      } else {
+        if (nextIndex < 2) {
+          setAnswer(boilerplates[selectedLanguage]);
+        } else {
+          setAnswer("");
+        }
+      }
+    }
+  };
+
+  // -----------------------------------
+  // PREVIOUS QUESTION
+  // -----------------------------------
+
+  const previousQuestion = async () => {
+    await saveAnswer();
+
+    const updatedAnswers = {
+      ...answers,
+
+      [currentQuestion]: answer,
+    };
+
+    setAnswers(updatedAnswers);
+
+    if (currentQuestion > 0) {
+      const prevIndex = currentQuestion - 1;
+
+      setCurrentQuestion(prevIndex);
+
+      const prevAnswer = updatedAnswers[prevIndex];
+
+      if (prevAnswer) {
+        setAnswer(prevAnswer);
+      } else {
+        if (prevIndex < 2) {
+          setAnswer(boilerplates[selectedLanguage]);
+        } else {
+          setAnswer("");
+        }
+      }
+    }
+  };
+
+  // -----------------------------------
+  // START RECORDING
+  // -----------------------------------
+
+  const startRecording = async () => {
+    if (isLocked) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+
+      const mediaRecorder = new MediaRecorder(stream);
+
+      mediaRecorderRef.current = mediaRecorder;
+
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+
+        const formData = new FormData();
+
+        formData.append("audio", audioBlob, "recording.webm");
 
         try {
+          setTranscribing(true);
 
-            const response =
-                await API.get(
-                    `/questions/session/${session_id}`
-                )
+          const response = await API.post("/voice/transcribe", formData, {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          });
 
-            const fetchedQuestions =
-                response.data.questions || []
+          const transcript = response.data.transcript || "";
 
-            setQuestions(fetchedQuestions)
-
-            // -----------------------------------
-            // INITIALIZE TIMERS
-            // -----------------------------------
-
-            const timers = {}
-
-            fetchedQuestions.forEach((_, index) => {
-
-                if (index < 2) {
-
-                    timers[index] = 1800
-                }
-
-                else {
-
-                    timers[index] = 300
-                }
-            })
-
-            setQuestionTimers(timers)
-
-            const fetchedAnswers =
-                response.data.answers || {}
-
-            setAnswers(fetchedAnswers)
-
-            const index =
-                response.data.current_question || 0
-
-            setCurrentQuestion(index)
-
-            const savedAnswer =
-                fetchedAnswers[index]
-
-            if (savedAnswer) {
-
-                setAnswer(savedAnswer)
-
+          if (transcript.trim() !== "") {
+            if (voiceMode === "replace") {
+              setAnswer(transcript);
             } else {
-
-                if (index < 2) {
-
-                    setAnswer(
-                        boilerplates.python
-                    )
-
-                } else {
-
-                    setAnswer("")
+              setAnswer((prev) => {
+                if (!prev || prev.trim() === "") {
+                  return transcript;
                 }
-            }
 
+                return prev + " " + transcript;
+              });
+            }
+          }
         } catch (error) {
+          console.log(error);
 
-            console.log(error)
+          alert("Voice transcription failed");
         }
 
-        setLoading(false)
+        setTranscribing(false);
+      };
+
+      mediaRecorder.start();
+
+      setRecording(true);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // -----------------------------------
+  // STOP RECORDING
+  // -----------------------------------
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+
+    setRecording(false);
+  };
+
+  // -----------------------------------
+  // SUBMIT INTERVIEW
+  // -----------------------------------
+
+  const submitInterview = async () => {
+    await saveAnswer();
+
+    try {
+      setSubmitting(true);
+
+      const response = await API.post("/evaluation/submit", {
+        session_id,
+      });
+
+      localStorage.setItem("evaluation", JSON.stringify(response.data));
+
+      navigate("/results");
+    } catch (error) {
+      console.log(error);
     }
 
-    // -----------------------------------
-    // CURRENT QUESTION
-    // -----------------------------------
-
-    const currentQuestionText =
-        questions[currentQuestion] || ""
-
-    const cleanQuestion =
-        currentQuestionText.replace(
-            /^\d+\.\s*/,
-            ""
-        )
-
-    const isCodingQuestion =
-        currentQuestion < 2
-
-    // -----------------------------------
-    // CURRENT TIMER
-    // -----------------------------------
-
-    const timeLeft =
-        questionTimers[currentQuestion] || 0
-
-    const isLocked =
-        lockedQuestions[currentQuestion] || false
-
-    // -----------------------------------
-    // PER QUESTION TIMER
-    // -----------------------------------
-
-    useEffect(() => {
-
-        if (loading) return
-
-        if (isLocked) return
-
-        const timer = setInterval(() => {
-
-            setQuestionTimers((prev) => {
-
-                const current =
-                    prev[currentQuestion]
-
-                if (current <= 1) {
-
-                    setLockedQuestions((old) => ({
-
-                        ...old,
-
-                        [currentQuestion]: true
-                    }))
-
-                    clearInterval(timer)
-
-                    return {
-
-                        ...prev,
-
-                        [currentQuestion]: 0
-                    }
-                }
-
-                return {
-
-                    ...prev,
-
-                    [currentQuestion]:
-                        current - 1
-                }
-            })
-
-        }, 1000)
-
-        return () =>
-            clearInterval(timer)
-
-    }, [currentQuestion, isLocked])
-
-    // -----------------------------------
-    // FORMAT TIMER
-    // -----------------------------------
-
-    const formatTime = (seconds) => {
-
-        const mins =
-            Math.floor(seconds / 60)
-
-        const secs =
-            seconds % 60
-
-        return `${mins}:${secs < 10
-                ? "0"
-                : ""
-            }${secs}`
-    }
-
-    // -----------------------------------
-    // AUTO SPEAK
-    // -----------------------------------
-
-    useEffect(() => {
-
-        if (!cleanQuestion) return
-
-        window.speechSynthesis.cancel()
-
-        const utterance =
-            new SpeechSynthesisUtterance(
-                cleanQuestion
-            )
-
-        window.speechSynthesis.speak(
-            utterance
-        )
-
-    }, [currentQuestion])
-
-    // -----------------------------------
-    // REPLAY QUESTION
-    // -----------------------------------
-
-    const replayQuestion = () => {
-
-        window.speechSynthesis.cancel()
-
-        const utterance =
-            new SpeechSynthesisUtterance(
-                cleanQuestion
-            )
-
-        window.speechSynthesis.speak(
-            utterance
-        )
-    }
-
-    // -----------------------------------
-    // SAVE ANSWER
-    // -----------------------------------
-
-    const saveAnswer = async () => {
-
-        try {
-
-            await API.post(
-                "/questions/save-answer",
-                {
-
-                    session_id,
-
-                    question_index:
-                        currentQuestion,
-
-                    answer,
-                }
-            )
-
-        } catch (error) {
-
-            console.log(error)
-        }
-    }
-
-    // -----------------------------------
-    // NEXT QUESTION
-    // -----------------------------------
-
-    const nextQuestion = async () => {
-
-        await saveAnswer()
-
-        const updatedAnswers = {
-
-            ...answers,
-
-            [currentQuestion]: answer
-        }
-
-        setAnswers(updatedAnswers)
-
-        if (
-            currentQuestion <
-            questions.length - 1
-        ) {
-
-            const nextIndex =
-                currentQuestion + 1
-
-            setCurrentQuestion(nextIndex)
-
-            const nextAnswer =
-                updatedAnswers[nextIndex]
-
-            if (nextAnswer) {
-
-                setAnswer(nextAnswer)
-
-            } else {
-
-                if (nextIndex < 2) {
-
-                    setAnswer(
-                        boilerplates[selectedLanguage]
-                    )
-
-                } else {
-
-                    setAnswer("")
-                }
-            }
-        }
-    }
-
-    // -----------------------------------
-    // PREVIOUS QUESTION
-    // -----------------------------------
-
-    const previousQuestion =
-        async () => {
-
-            await saveAnswer()
-
-            const updatedAnswers = {
-
-                ...answers,
-
-                [currentQuestion]: answer
-            }
-
-            setAnswers(updatedAnswers)
-
-            if (currentQuestion > 0) {
-
-                const prevIndex =
-                    currentQuestion - 1
-
-                setCurrentQuestion(prevIndex)
-
-                const prevAnswer =
-                    updatedAnswers[prevIndex]
-
-                if (prevAnswer) {
-
-                    setAnswer(prevAnswer)
-
-                } else {
-
-                    if (prevIndex < 2) {
-
-                        setAnswer(
-                            boilerplates[selectedLanguage]
-                        )
-
-                    } else {
-
-                        setAnswer("")
-                    }
-                }
-            }
-        }
-
-    // -----------------------------------
-    // START RECORDING
-    // -----------------------------------
-
-    const startRecording =
-        async () => {
-
-            if (isLocked) return
-
-            try {
-
-                const stream =
-                    await navigator
-                        .mediaDevices
-                        .getUserMedia({
-                            audio: true
-                        })
-
-                const mediaRecorder =
-                    new MediaRecorder(stream)
-
-                mediaRecorderRef.current =
-                    mediaRecorder
-
-                audioChunksRef.current = []
-
-                mediaRecorder.ondataavailable =
-                    (event) => {
-
-                        audioChunksRef.current.push(
-                            event.data
-                        )
-                    }
-
-                mediaRecorder.onstop =
-                    async () => {
-
-                        const audioBlob =
-                            new Blob(
-                                audioChunksRef.current,
-                                {
-                                    type: "audio/webm"
-                                }
-                            )
-
-                        const formData =
-                            new FormData()
-
-                        formData.append(
-                            "audio",
-                            audioBlob,
-                            "recording.webm"
-                        )
-
-                        try {
-
-                            setTranscribing(true)
-
-                            const response =
-                                await API.post(
-                                    "/voice/transcribe",
-                                    formData,
-                                    {
-
-                                        headers: {
-
-                                            "Content-Type":
-                                                "multipart/form-data"
-                                        }
-                                    }
-                                )
-
-                            const transcript =
-                                response.data.transcript || ""
-
-                            if (
-                                transcript.trim() !== ""
-                            ) {
-
-                                if (voiceMode === "replace") {
-
-                                    setAnswer(
-                                        transcript
-                                    )
-
-                                } else {
-
-                                    setAnswer((prev) => {
-
-                                        if (
-                                            !prev ||
-                                            prev.trim() === ""
-                                        ) {
-
-                                            return transcript
-                                        }
-
-                                        return (
-                                            prev +
-                                            " " +
-                                            transcript
-                                        )
-                                    })
-                                }
-                            }
-
-                        } catch (error) {
-
-                            console.log(error)
-
-                            alert(
-                                "Voice transcription failed"
-                            )
-                        }
-
-                        setTranscribing(false)
-                    }
-
-                mediaRecorder.start()
-
-                setRecording(true)
-
-            } catch (error) {
-
-                console.log(error)
-            }
-        }
-
-    // -----------------------------------
-    // STOP RECORDING
-    // -----------------------------------
-
-    const stopRecording = () => {
-
-        mediaRecorderRef.current?.stop()
-
-        setRecording(false)
-    }
-
-    // -----------------------------------
-    // SUBMIT INTERVIEW
-    // -----------------------------------
-
-    const submitInterview =
-        async () => {
-
-            await saveAnswer()
-
-            try {
-
-                setSubmitting(true)
-
-                const response =
-                    await API.post(
-                        "/evaluation/submit",
-                        {
-                            session_id
-                        }
-                    )
-
-                localStorage.setItem(
-                    "evaluation",
-                    JSON.stringify(
-                        response.data
-                    )
-                )
-
-                navigate("/results")
-
-            } catch (error) {
-
-                console.log(error)
-            }
-
-            setSubmitting(false)
-        }
-
-    // -----------------------------------
-    // LOADING
-    // -----------------------------------
-
-    if (loading) {
-
-        return (
-
-            <div className="
+    setSubmitting(false);
+  };
+
+  // -----------------------------------
+  // LOADING
+  // -----------------------------------
+
+  if (loading) {
+    return (
+      <div
+        className="
                 min-h-screen
                 flex
                 items-center
                 justify-center
                 bg-black
                 text-white
-            ">
+            "
+      >
+        Loading Interview...
+      </div>
+    );
+  }
 
-                Loading Interview...
-
-            </div>
-        )
-    }
-
-    return (
-
-        <div className="
+  return (
+    <div
+      className="
             relative
             min-h-screen
             overflow-hidden
             text-white
             px-6
             py-10
-        ">
+        "
+    >
+      <Background />
 
-            <Background />
-
-            <motion.div
-
-                initial={{
-                    opacity: 0,
-                    y: 30
-                }}
-
-                animate={{
-                    opacity: 1,
-                    y: 0
-                }}
-
-                className="
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 30,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        className="
                     relative
                     z-10
                     max-w-5xl
                     mx-auto
                 "
-            >
+      >
+        {/* HEADER */}
 
-                {/* HEADER */}
-
-                <div className="
+        <div
+          className="
                     flex
                     justify-between
                     items-center
                     mb-6
-                ">
-
-                    <div>
-
-                        <h1 className="
+                "
+        >
+          <div>
+            <h1
+              className="
                             text-5xl
                             font-black
                             bg-gradient-to-r
@@ -716,20 +526,20 @@ public class Main {
                             to-purple-500
                             bg-clip-text
                             text-transparent
-                        ">
+                        "
+            >
+              AI Interview Session
+            </h1>
+          </div>
 
-                            AI Interview Session
-
-                        </h1>
-
-                    </div>
-
-                    <div className="
+          <div
+            className="
                         flex
                         gap-4
-                    ">
-
-                        <div className="
+                    "
+          >
+            <div
+              className="
                             px-5
                             py-3
                             rounded-2xl
@@ -738,92 +548,78 @@ public class Main {
                             border-cyan-400/20
                             text-cyan-300
                             font-bold
-                        ">
-
-                            <div className="
+                        "
+            >
+              <div
+                className="
                                 flex
                                 items-center
                                 gap-2
-                            ">
+                            "
+              >
+                <Clock3 size={18} />
 
-                                <Clock3 size={18} />
+                {formatTime(timeLeft)}
+              </div>
+            </div>
 
-                                {formatTime(timeLeft)}
-
-                            </div>
-
-                        </div>
-
-                        <div className="
+            <div
+              className="
                             px-5
                             py-3
                             rounded-2xl
                             bg-black/40
                             border
                             border-white/10
-                        ">
+                        "
+            >
+              Question {currentQuestion + 1} / {questions.length}
+            </div>
+          </div>
+        </div>
 
-                            Question {
-                                currentQuestion + 1
-                            } / {
-                                questions.length
-                            }
+        {/* PROGRESS */}
 
-                        </div>
-
-                    </div>
-
-                </div>
-
-                {/* PROGRESS */}
-
-                <div className="
+        <div
+          className="
                     w-full
                     h-3
                     rounded-full
                     bg-white/10
                     overflow-hidden
                     mb-8
-                ">
-
-                    <div
-
-                        style={{
-                            width: `${(
-                                (
-                                    currentQuestion + 1
-                                )
-                                / questions.length
-                            ) * 100}%`
-                        }}
-
-                        className="
+                "
+        >
+          <div
+            style={{
+              width: `${((currentQuestion + 1) / questions.length) * 100}%`,
+            }}
+            className="
                             h-full
                             bg-gradient-to-r
                             from-cyan-400
                             to-purple-500
                         "
-                    />
+          />
+        </div>
 
-                </div>
+        {/* MAIN CARD */}
 
-                {/* MAIN CARD */}
-
-                <div className="
+        <div
+          className="
                     backdrop-blur-2xl
                     bg-white/[0.04]
                     border
                     border-white/10
                     rounded-[36px]
                     p-8
-                ">
+                "
+        >
+          {/* LOCK MESSAGE */}
 
-                    {/* LOCK MESSAGE */}
-
-                    {
-                        isLocked && (
-
-                            <div className="
+          {isLocked && (
+            <div
+              className="
                                 mb-6
                                 p-4
                                 rounded-2xl
@@ -832,28 +628,25 @@ public class Main {
                                 border-red-500/30
                                 text-red-300
                                 font-semibold
-                            ">
+                            "
+            >
+              Time is up for this question. Answer editing has been locked.
+            </div>
+          )}
 
-                                Time is up for this question.
-                                Answer editing has been locked.
+          {/* QUESTION TYPE */}
 
-                            </div>
-                        )
-                    }
-
-                    {/* QUESTION TYPE */}
-
-                    <div className="
+          <div
+            className="
                         flex
                         items-center
                         gap-3
                         mb-6
-                    ">
-
-                        {
-                            isCodingQuestion ? (
-
-                                <div className="
+                    "
+          >
+            {isCodingQuestion ? (
+              <div
+                className="
                                     flex
                                     items-center
                                     gap-2
@@ -864,17 +657,14 @@ public class Main {
                                     border
                                     border-cyan-400/20
                                     text-cyan-300
-                                ">
-
-                                    <Code2 size={18} />
-
-                                    Coding Question
-
-                                </div>
-
-                            ) : (
-
-                                <div className="
+                                "
+              >
+                <Code2 size={18} />
+                Coding Question
+              </div>
+            ) : (
+              <div
+                className="
                                     flex
                                     items-center
                                     gap-2
@@ -885,38 +675,32 @@ public class Main {
                                     border
                                     border-pink-400/20
                                     text-pink-300
-                                ">
+                                "
+              >
+                <Mic size={18} />
+                Voice Question
+              </div>
+            )}
+          </div>
 
-                                    <Mic size={18} />
+          {/* QUESTION */}
 
-                                    Voice Question
-
-                                </div>
-                            )
-                        }
-
-                    </div>
-
-                    {/* QUESTION */}
-
-                    <h2 className="
+          <h2
+            className="
                         text-3xl
                         font-bold
                         leading-relaxed
                         mb-8
-                    ">
+                    "
+          >
+            {currentQuestion + 1}. {cleanQuestion}
+          </h2>
 
-                        {currentQuestion + 1}. {cleanQuestion}
+          {/* REPLAY */}
 
-                    </h2>
-
-                    {/* REPLAY */}
-
-                    <button
-
-                        onClick={replayQuestion}
-
-                        className="
+          <button
+            onClick={replayQuestion}
+            className="
                             flex
                             items-center
                             gap-2
@@ -929,60 +713,43 @@ public class Main {
                             text-cyan-300
                             mb-6
                         "
-                    >
+          >
+            <Volume2 size={18} />
+            Replay Question
+          </button>
 
-                        <Volume2 size={18} />
+          {isCodingQuestion ? (
+            <div>
+              {/* LANGUAGE */}
 
-                        Replay Question
-
-                    </button>
-
-                    {
-                        isCodingQuestion ? (
-
-                            <div>
-
-                                {/* LANGUAGE */}
-
-                                <div className="
+              <div
+                className="
                                     flex
                                     justify-between
                                     items-center
                                     mb-5
-                                ">
-
-                                    <div className="
+                                "
+              >
+                <div
+                  className="
                                         text-cyan-300
                                         font-semibold
-                                    ">
+                                    "
+                >
+                  Select Coding Language
+                </div>
 
-                                        Select Coding Language
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => {
+                    const lang = e.target.value;
 
-                                    </div>
+                    setSelectedLanguage(lang);
 
-                                    <select
-
-                                        value={
-                                            selectedLanguage
-                                        }
-
-                                        onChange={(e) => {
-
-                                            const lang =
-                                                e.target.value
-
-                                            setSelectedLanguage(
-                                                lang
-                                            )
-
-                                            setAnswer(
-                                                boilerplates[lang]
-                                            )
-                                        }}
-
-                                        disabled={isLocked}
-
-                                        className="
+                    setAnswer(boilerplates[lang]);
+                  }}
+                  disabled={isLocked}
+                  className="
                                             bg-black/40
                                             border
                                             border-cyan-400/20
@@ -992,86 +759,57 @@ public class Main {
                                             rounded-xl
                                             outline-none
                                         "
-                                    >
+                >
+                  <option value="python">Python</option>
 
-                                        <option value="python">
-                                            Python
-                                        </option>
+                  <option value="javascript">JavaScript</option>
 
-                                        <option value="javascript">
-                                            JavaScript
-                                        </option>
+                  <option value="cpp">C++</option>
 
-                                        <option value="cpp">
-                                            C++
-                                        </option>
+                  <option value="java">Java</option>
+                </select>
+              </div>
 
-                                        <option value="java">
-                                            Java
-                                        </option>
+              {/* EDITOR */}
 
-                                    </select>
+              <Editor
+                height="420px"
+                language={selectedLanguage}
+                theme="vs-dark"
+                value={answer}
+                onChange={(value) => setAnswer(value || "")}
+                options={{
+                  readOnly: isLocked,
+                }}
+              />
+            </div>
+          ) : (
+            <div>
+              {/* VOICE MODE */}
 
-                                </div>
-
-                                {/* EDITOR */}
-
-                                <Editor
-
-                                    height="420px"
-
-                                    language={
-                                        selectedLanguage
-                                    }
-
-                                    theme="vs-dark"
-
-                                    value={answer}
-
-                                    onChange={(value) =>
-                                        setAnswer(value || "")
-                                    }
-
-                                    options={{
-                                        readOnly: isLocked
-                                    }}
-                                />
-
-                            </div>
-
-                        ) : (
-
-                            <div>
-
-                                {/* VOICE MODE */}
-
-                                <div className="
+              <div
+                className="
                                     flex
                                     gap-3
                                     mb-5
-                                ">
-
-                                    <button
-
-                                        onClick={() =>
-                                            setVoiceMode("replace")
-                                        }
-
-                                        className={`
+                                "
+              >
+                <button
+                  onClick={() => setVoiceMode("replace")}
+                  className={`
                                             px-4
                                             py-2
                                             rounded-xl
                                             font-semibold
 
-                                            ${voiceMode === "replace"
-
+                                            ${
+                                              voiceMode === "replace"
                                                 ? `
                                                     bg-gradient-to-r
                                                     from-pink-500
                                                     to-red-500
                                                     text-white
                                                   `
-
                                                 : `
                                                     bg-black/40
                                                     border
@@ -1080,33 +818,26 @@ public class Main {
                                                   `
                                             }
                                         `}
-                                    >
+                >
+                  🔄 Replace
+                </button>
 
-                                        🔄 Replace
-
-                                    </button>
-
-                                    <button
-
-                                        onClick={() =>
-                                            setVoiceMode("extend")
-                                        }
-
-                                        className={`
+                <button
+                  onClick={() => setVoiceMode("extend")}
+                  className={`
                                             px-4
                                             py-2
                                             rounded-xl
                                             font-semibold
 
-                                            ${voiceMode === "extend"
-
+                                            ${
+                                              voiceMode === "extend"
                                                 ? `
                                                     bg-gradient-to-r
                                                     from-cyan-400
                                                     to-purple-500
                                                     text-white
                                                   `
-
                                                 : `
                                                     bg-black/40
                                                     border
@@ -1115,34 +846,25 @@ public class Main {
                                                   `
                                             }
                                         `}
-                                    >
+                >
+                  ➕ Extend
+                </button>
+              </div>
 
-                                        ➕ Extend
+              {/* RECORD */}
 
-                                    </button>
-
-                                </div>
-
-                                {/* RECORD */}
-
-                                <div className="
+              <div
+                className="
                                     flex
                                     gap-4
                                     mb-6
-                                ">
-
-                                    {
-                                        !recording ? (
-
-                                            <button
-
-                                                onClick={
-                                                    startRecording
-                                                }
-
-                                                disabled={isLocked}
-
-                                                className={`
+                                "
+              >
+                {!recording ? (
+                  <button
+                    onClick={startRecording}
+                    disabled={isLocked}
+                    className={`
                                                     flex
                                                     items-center
                                                     gap-2
@@ -1153,7 +875,8 @@ public class Main {
                                                     from-pink-500
                                                     to-red-500
 
-                                                    ${isLocked
+                                                    ${
+                                                      isLocked
                                                         ? `
                                                                 opacity-50
                                                                 cursor-not-allowed
@@ -1161,23 +884,14 @@ public class Main {
                                                         : ""
                                                     }
                                                 `}
-                                            >
-
-                                                <Mic size={20} />
-
-                                                Start Recording
-
-                                            </button>
-
-                                        ) : (
-
-                                            <button
-
-                                                onClick={
-                                                    stopRecording
-                                                }
-
-                                                className="
+                  >
+                    <Mic size={20} />
+                    Start Recording
+                  </button>
+                ) : (
+                  <button
+                    onClick={stopRecording}
+                    className="
                                                     flex
                                                     items-center
                                                     gap-2
@@ -1186,50 +900,33 @@ public class Main {
                                                     rounded-2xl
                                                     bg-red-600
                                                 "
-                                            >
+                  >
+                    <Square size={20} />
+                    Stop Recording
+                  </button>
+                )}
 
-                                                <Square size={20} />
-
-                                                Stop Recording
-
-                                            </button>
-                                        )
-                                    }
-
-                                    {
-                                        transcribing && (
-
-                                            <div className="
+                {transcribing && (
+                  <div
+                    className="
                                                 flex
                                                 items-center
                                                 text-cyan-300
-                                            ">
+                                            "
+                  >
+                    Transcribing...
+                  </div>
+                )}
+              </div>
 
-                                                Transcribing...
+              {/* TEXTAREA */}
 
-                                            </div>
-                                        )
-                                    }
-
-                                </div>
-
-                                {/* TEXTAREA */}
-
-                                <textarea
-
-                                    value={answer}
-
-                                    onChange={(e) =>
-                                        setAnswer(
-                                            e.target.value
-                                        )
-                                    }
-
-                                    disabled={isLocked}
-
-                                    placeholder="Speak or type your answer here..."
-
-                                    className="
+              <textarea
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                disabled={isLocked}
+                placeholder="Speak or type your answer here..."
+                className="
                                         w-full
                                         h-72
                                         p-6
@@ -1240,32 +937,24 @@ public class Main {
                                         outline-none
                                         resize-none
                                     "
-                                />
+              />
+            </div>
+          )}
 
-                            </div>
-                        )
-                    }
+          {/* NAVIGATION */}
 
-                    {/* NAVIGATION */}
-
-                    <div className="
+          <div
+            className="
                         flex
                         justify-between
                         items-center
                         mt-10
-                    ">
-
-                        <button
-
-                            onClick={
-                                previousQuestion
-                            }
-
-                            disabled={
-                                currentQuestion === 0
-                            }
-
-                            className="
+                    "
+          >
+            <button
+              onClick={previousQuestion}
+              disabled={currentQuestion === 0}
+              className="
                                 flex
                                 items-center
                                 gap-2
@@ -1276,25 +965,15 @@ public class Main {
                                 border
                                 border-white/10
                             "
-                        >
+            >
+              <ChevronLeft size={20} />
+              Previous
+            </button>
 
-                            <ChevronLeft size={20} />
-
-                            Previous
-
-                        </button>
-
-                        {
-                            currentQuestion ===
-                                questions.length - 1 ? (
-
-                                <button
-
-                                    onClick={
-                                        submitInterview
-                                    }
-
-                                    className="
+            {currentQuestion === questions.length - 1 ? (
+              <button
+                onClick={submitInterview}
+                className="
                                         px-8
                                         py-3
                                         rounded-2xl
@@ -1303,25 +982,13 @@ public class Main {
                                         from-cyan-400
                                         to-purple-500
                                     "
-                                >
-
-                                    {
-                                        submitting
-                                            ? "Evaluating..."
-                                            : "Submit Interview"
-                                    }
-
-                                </button>
-
-                            ) : (
-
-                                <button
-
-                                    onClick={
-                                        nextQuestion
-                                    }
-
-                                    className="
+              >
+                {submitting ? "Evaluating..." : "Submit Interview"}
+              </button>
+            ) : (
+              <button
+                onClick={nextQuestion}
+                className="
                                         flex
                                         items-center
                                         gap-2
@@ -1333,24 +1000,16 @@ public class Main {
                                         from-cyan-400
                                         to-purple-500
                                     "
-                                >
-
-                                    Next
-
-                                    <ChevronRight size={20} />
-
-                                </button>
-                            )
-                        }
-
-                    </div>
-
-                </div>
-
-            </motion.div>
-
+              >
+                Next
+                <ChevronRight size={20} />
+              </button>
+            )}
+          </div>
         </div>
-    )
+      </motion.div>
+    </div>
+  );
 }
 
-export default Interview
+export default Interview;
