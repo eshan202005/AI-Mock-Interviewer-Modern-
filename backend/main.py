@@ -5,8 +5,13 @@ from routers import resume
 from routers import interview
 from routers import evaluation
 from routers import voice
+from database.db import engine
+from database.models import Base
 
 app = FastAPI()
+
+# Create tables
+Base.metadata.create_all(bind=engine)
 
 # CORS
 app.add_middleware(

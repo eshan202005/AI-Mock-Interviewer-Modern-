@@ -6,6 +6,10 @@ import uuid
 from services.question_generater import generate_questions
 from services.interview_store import interview_sessions
 
+# DATABASE IMPORTS
+from database.db import SessionLocal
+from database.models import Interview
+
 router = APIRouter(
     prefix="/questions",
     tags=["Questions"]
@@ -13,7 +17,7 @@ router = APIRouter(
 
 
 # -----------------------------
-# Request Models
+# REQUEST MODELS
 # -----------------------------
 
 class InterviewRequest(BaseModel):
@@ -30,7 +34,7 @@ class AnswerRequest(BaseModel):
 
 
 # -----------------------------
-# Generate Questions
+# GENERATE QUESTIONS
 # -----------------------------
 
 @router.post("/generate")
@@ -47,11 +51,39 @@ def generate_interview_questions(
 
     session_id = str(uuid.uuid4())
 
+    # -----------------------------
+    # SAVE IN MEMORY ONLY
+    # -----------------------------
+
     interview_sessions[session_id] = {
         "questions": questions,
         "answers": {},
         "current_question": 0
     }
+
+    # -----------------------------
+    # SAVE SUMMARY IN DATABASE
+    # -----------------------------
+
+    db = SessionLocal()
+
+    new_interview = Interview(
+        session_id=session_id,
+        role=data.role,
+        skills=", ".join(data.skills),
+        projects=", ".join(data.projects),
+        experience=", ".join(data.experience),
+        total_score="Pending",
+        evaluation="Pending"
+    )
+
+    db.add(new_interview)
+
+    db.commit()
+
+    db.refresh(new_interview)
+
+    db.close()
 
     return {
         "session_id": session_id,
@@ -61,7 +93,7 @@ def generate_interview_questions(
 
 
 # -----------------------------
-# Save Answer
+# SAVE ANSWER
 # -----------------------------
 
 @router.post("/save-answer")
@@ -79,6 +111,8 @@ def save_answer(
             "error": "Invalid session ID"
         }
 
+    # SAVE ANSWERS ONLY IN MEMORY
+
     session["answers"][data.question_index] = data.answer
 
     return {
@@ -87,7 +121,7 @@ def save_answer(
 
 
 # -----------------------------
-# Get Full Session
+# GET SESSION
 # -----------------------------
 
 @router.get("/session/{session_id}")
@@ -109,7 +143,7 @@ def get_session(
 
 
 # -----------------------------
-# Next Question
+# NEXT QUESTION
 # -----------------------------
 
 @router.post("/next-question")
@@ -142,7 +176,7 @@ def next_question(
 
 
 # -----------------------------
-# Previous Question
+# PREVIOUS QUESTION
 # -----------------------------
 
 @router.post("/previous-question")
@@ -168,3 +202,34 @@ def previous_question(
         "current_question":
         session["current_question"]
     }
+
+
+# -----------------------------
+# GET ALL INTERVIEWS
+# -----------------------------
+
+@router.get("/all")
+def get_all_interviews():
+
+    db = SessionLocal()
+
+    interviews = db.query(Interview).all()
+
+    result = []
+
+    for interview in interviews:
+
+        result.append({
+            "id": interview.id,
+            "role": interview.role,
+            "skills": interview.skills,
+            "projects": interview.projects,
+            "experience": interview.experience,
+            "total_score": interview.total_score,
+            "evaluation": interview.evaluation,
+            "created_at": interview.created_at
+        })
+
+    db.close()
+
+    return result
