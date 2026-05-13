@@ -4,6 +4,10 @@ from pydantic import BaseModel
 from services.interview_store import interview_sessions
 from services.evaluation_agent import evaluate_answer
 
+# DATABASE IMPORTS
+from database.db import SessionLocal
+from database.models import Interview
+
 router = APIRouter(
     prefix="/evaluation",
     tags=["Evaluation"]
@@ -40,7 +44,7 @@ def submit_interview(
     weaknesses = []
 
     # ---------------------------------
-    # Loop Through Questions
+    # LOOP THROUGH QUESTIONS
     # ---------------------------------
 
     for index, question in enumerate(questions):
@@ -51,7 +55,7 @@ def submit_interview(
         )
 
         # ---------------------------------
-        # Safe AI Evaluation
+        # SAFE AI EVALUATION
         # ---------------------------------
 
         try:
@@ -69,7 +73,7 @@ def submit_interview(
             )
 
         # ---------------------------------
-        # Score Logic
+        # SCORE LOGIC
         # ---------------------------------
 
         if (
@@ -118,7 +122,7 @@ def submit_interview(
         total_score += score
 
         # ---------------------------------
-        # Store Evaluation
+        # STORE EVALUATION
         # ---------------------------------
 
         evaluations.append({
@@ -135,7 +139,7 @@ def submit_interview(
         })
 
     # ---------------------------------
-    # Final Score Calculation
+    # FINAL SCORE CALCULATION
     # ---------------------------------
 
     if len(questions) > 0:
@@ -152,7 +156,7 @@ def submit_interview(
         final_score = 0
 
     # ---------------------------------
-    # AI Summary
+    # AI SUMMARY
     # ---------------------------------
 
     if final_score >= 80:
@@ -180,7 +184,7 @@ def submit_interview(
         )
 
     # ---------------------------------
-    # Default Strengths
+    # DEFAULT STRENGTHS
     # ---------------------------------
 
     if len(strengths) == 0:
@@ -190,7 +194,7 @@ def submit_interview(
         )
 
     # ---------------------------------
-    # Default Weaknesses
+    # DEFAULT WEAKNESSES
     # ---------------------------------
 
     if len(weaknesses) == 0:
@@ -198,6 +202,31 @@ def submit_interview(
         weaknesses.append(
             "Can further improve answer depth"
         )
+
+    # ---------------------------------
+    # SAVE TO DATABASE
+    # ---------------------------------
+
+    db = SessionLocal()
+
+    interview = db.query(Interview).filter(
+        Interview.session_id == data.session_id
+    ).first()
+
+    if interview:
+
+        interview.total_score = str(final_score)
+
+        interview.evaluation = str({
+            "summary": summary,
+            "strengths": strengths,
+            "weaknesses": weaknesses,
+            "feedback": evaluations
+        })
+
+        db.commit()
+
+    db.close()
 
     # ---------------------------------
     # FINAL RESPONSE
