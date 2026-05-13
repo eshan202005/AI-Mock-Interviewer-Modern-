@@ -38,11 +38,18 @@ IMPORTANT — Follow this exact order:
 
 2. Question 2 — DSA Coding Question (Medium)
 
-These two coding questions MUST be LeetCode-style problems.
+These two coding questions MUST be formatted EXACTLY like LeetCode.
 
 VERY IMPORTANT FORMATTING RULES FOR CODING QUESTIONS:
 
-Format coding questions EXACTLY like this:
+- Use proper line breaks
+- Put each section on a new line
+- Never write everything in one paragraph
+- Keep formatting clean and professional
+- Use spacing exactly like LeetCode
+- Coding questions MUST be multiline formatted
+
+Use EXACTLY this structure:
 
 Question:
 <problem statement>
@@ -66,18 +73,20 @@ If the problem involves:
 - Trees
 - Graphs
 
-Then include a simple text diagram.
+Then include a text diagram.
 
 Example linked list diagram:
+
 1 -> 2 -> 3 -> 4
 
 Example tree diagram:
 
-      1
-     / \\
-    2   3
+        1
+       / \\
+      2   3
 
-Keep formatting clean and professional.
+VERY IMPORTANT:
+DO NOT compress coding questions into one paragraph.
 
 3–6 — Skill-based questions
 These must be based on the candidate's skills.
@@ -122,6 +131,8 @@ VERY IMPORTANT:
 - All remaining questions must be non-coding
 - Coding questions must contain proper spacing and line breaks
 - Use professional formatting like LeetCode
+- Preserve all line breaks
+- Do not merge Input/Output/Constraints into one line
 
 Return only numbered questions.
 """
