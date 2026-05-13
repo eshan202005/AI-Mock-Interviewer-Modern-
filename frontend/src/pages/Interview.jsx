@@ -347,7 +347,7 @@ public class Main {
         }
 
     }, [currentQuestion, cleanQuestion, loading])
- 
+
     // -----------------------------------
     // REPLAY QUESTION
     // -----------------------------------
@@ -927,16 +927,22 @@ public class Main {
 
                     {/* QUESTION */}
 
-                    <h2 className="
+                    <pre
+                        className="
                         text-3xl
                         font-bold
                         leading-relaxed
                         mb-8
-                    ">
+                        whitespace-pre-wrap
+                        text-white  
+                        font-sans
+                        
+                    "
+                    >
 
                         {currentQuestion + 1}. {cleanQuestion}
 
-                    </h2>
+                    </pre>
 
                     {/* REPLAY */}
 
