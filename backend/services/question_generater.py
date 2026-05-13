@@ -38,12 +38,46 @@ IMPORTANT — Follow this exact order:
 
 2. Question 2 — DSA Coding Question (Medium)
 
-These two coding questions MUST be LeetCode-style problems including:
+These two coding questions MUST be LeetCode-style problems.
 
-- Problem statement
-- Input
-- Output
-- Constraints
+VERY IMPORTANT FORMATTING RULES FOR CODING QUESTIONS:
+
+Format coding questions EXACTLY like this:
+
+Question:
+<problem statement>
+
+Example 1:
+Input:
+...
+
+Output:
+...
+
+Explanation:
+...
+
+Constraints:
+- ...
+- ...
+
+If the problem involves:
+- Linked Lists
+- Trees
+- Graphs
+
+Then include a simple text diagram.
+
+Example linked list diagram:
+1 -> 2 -> 3 -> 4
+
+Example tree diagram:
+
+      1
+     / \\
+    2   3
+
+Keep formatting clean and professional.
 
 3–6 — Skill-based questions
 These must be based on the candidate's skills.
@@ -75,7 +109,6 @@ CRITICAL RULES:
 
 - Generate EXACTLY the required number of questions
 - Return ONLY numbered questions
-- Do NOT include explanations
 - Do NOT include headings
 - Questions MUST start with proper numbering format
 
@@ -87,6 +120,8 @@ Example:
 VERY IMPORTANT:
 - Only Question 1 and Question 2 should be coding questions
 - All remaining questions must be non-coding
+- Coding questions must contain proper spacing and line breaks
+- Use professional formatting like LeetCode
 
 Return only numbered questions.
 """
@@ -103,7 +138,6 @@ Return only numbered questions.
 
     questions_text = response.choices[0].message.content
 
-    # Better regex parsing
     pattern = r"\d+\.\s.*?(?=\n\d+\.|\Z)"
 
     matches = re.findall(

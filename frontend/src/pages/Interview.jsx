@@ -347,7 +347,7 @@ public class Main {
         }
 
     }, [currentQuestion, cleanQuestion, loading])
-
+ 
     // -----------------------------------
     // REPLAY QUESTION
     // -----------------------------------
