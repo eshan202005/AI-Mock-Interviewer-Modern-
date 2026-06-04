@@ -7,18 +7,23 @@ load_dotenv()
 
 
 def generate_questions(role, skills, projects, experience):
+# Create Groq client for generating interview questions
 
     client = Groq(
         api_key=os.getenv("GROQ_API_KEY")
     )
+     # Determine whether the candidate has prior experience
 
     has_experience = len(experience) > 0
-
+# Generate different numbers of questions
+    # depending on candidate experience level
     if has_experience:
         question_count = 15
     else:
         question_count = 12
-
+# Build a dynamic prompt using candidate profile information.
+    # The AI uses role, skills, projects and experience
+    # to generate personalized interview questions.
     prompt = f"""
 You are an expert technical interviewer.
 
@@ -94,7 +99,8 @@ These must be based on the candidate's skills.
 7–10 — Project-based questions
 These must be based on the candidate's projects.
 """
-
+# Add experience-based questions only for experienced candidates.
+    # Freshers receive fewer questions and more focus on HR.
     if has_experience:
 
         prompt += """
@@ -106,7 +112,8 @@ These must be based on the candidate's work experience.
 """
 
     else:
-
+ # Add final formatting instructions to ensure
+    # consistent numbered output from the LLM.
         prompt += """
 
 11–12 — HR questions
@@ -136,7 +143,7 @@ VERY IMPORTANT:
 
 Return only numbered questions.
 """
-
+# Send question-generation request to Groq LLM
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[
@@ -148,6 +155,9 @@ Return only numbered questions.
     )
 
     questions_text = response.choices[0].message.content
+
+     # Use regex to split the LLM response into
+    # individual numbered questions
 
     pattern = r"\d+\.\s.*?(?=\n\d+\.|\Z)"
 
@@ -161,7 +171,7 @@ Return only numbered questions.
         q.strip()
         for q in matches
     ]
-
+ # Ensure the final list contains only the required number of questions
     questions = questions[:question_count]
 
     return questions

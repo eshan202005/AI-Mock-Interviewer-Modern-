@@ -1,19 +1,32 @@
+"""Evaluation helper for interview questions using Groq API."""
+
 from groq import Groq
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()#load environment variables from .env file, including GROQ_API_KEY
 
 
 def evaluate_answer(question, answer, question_number):
+    """Evaluate a candidate answer and return structured feedback.
 
+    Args:
+        question (str): The interview question text.
+        answer (str): The candidate's answer text.
+        question_number (int): Zero-based index of the question.
+
+    Returns:
+        str: Structured evaluation output from the Groq model.
+    """
+
+    # Create the Groq client using the API key from the environment.
     client = Groq(
         api_key=os.getenv("GROQ_API_KEY")
     )
 
     clean_answer = answer.strip()
 
-    # Default editor templates that should count as NOT ATTEMPTED
+    # These default editor templates should count as unanswered.
     default_templates = [
         "",
         "# Write your Python solution here\n\ndef solve():\n    pass",
@@ -23,36 +36,33 @@ def evaluate_answer(question, answer, question_number):
         "pass"
     ]
 
-    # Check if coding answer is empty/template
+    # For the first two questions, treat short or template code as not attempted.
     if question_number < 2:
-
         if (
             not clean_answer or
             clean_answer in default_templates or
             len(clean_answer) < 5
         ):
-
             return (
                 "Result: Not Attempted\n"
                 "Score: 0/10\n"
                 "Feedback: No code was provided.\n"
-                "Improvement: Write code to solve the problem."
+                "Improvement: Write code to solve the problem.\n"
             )
 
-    # Check if non-coding answer is empty
+    # For non-coding questions, treat a very short response as not attempted.
     else:
-
         if (
             not clean_answer or
             len(clean_answer) < 5
         ):
-
             return (
                 "Result: Not Attempted\n"
                 "Feedback: No response was provided.\n"
-                "Improvement: Provide a detailed answer."
+                "Improvement: Provide a detailed answer.\n"
             )
 
+    # Build the prompt for the language model.
     prompt = f"""
 You are an expert technical interviewer.
 
@@ -123,4 +133,5 @@ Return in clean structured format.
         ]
     )
 
-    return response.choices[0].message.content
+    # Return the raw text from the API response.
+    return response.choices[0].message.content  
