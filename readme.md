@@ -1,88 +1,55 @@
-AI Mock Interview Platform
+# AI Mock Interview Platform
 
-A modern AI-powered mock interview platform built with React, FastAPI, and AI models.
-The platform generates technical, coding, and voice-based interview questions from resumes and evaluates user responses with AI-generated scoring and feedback.
+An AI-powered mock interview platform designed to simulate real-world interview experiences across Coding, Technical, and Voice interview modes.
 
-Features
-AI-generated interview questions
-Resume parsing and skill extraction
-Coding interview support
-Monaco code editor
-Multiple programming language selection
-Voice interview mode
-Speech-to-text transcription
-Replace / Extend answer options
-AI evaluation and scoring
-Per-question timer system
-Question navigation with saved answers
-Modern animated UI
-Responsive design
-Tech Stack
-Frontend
-React + Vite
-Tailwind CSS
-Framer Motion
-Monaco Editor
-Axios
-Backend
-FastAPI
-Python
-Uvicorn
-AI / Services
-Resume parsing
-Question generation
-Voice transcription
-AI answer evaluation
-Project Structure
-ai/
-│
-├── backend/
-│   ├── routers/
-│   ├── services/
-│   ├── uploads/
-│   └── main.py
-│
-├── frontend/
-│   ├── src/
-│   ├── public/
-│   └── package.json
-│
-└── .gitignore
-Installation
-Clone Repository
-git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
-cd YOUR_REPOSITORY
-Backend Setup
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload
+## Features
 
-Backend runs on:
+* AI-generated interview questions tailored to different interview types
+* Coding interview environment powered by Monaco Editor
+* Technical interview mode with automated evaluation and feedback
+* Voice interview mode with real-time speech-to-text and AI interaction
+* Resume parsing and intelligent question generation
+* Detailed performance reports and structured feedback
+* Multi-language coding support
+* Timer-based interview sessions with automatic submission locking
 
-http://127.0.0.1:8000
-Frontend Setup
-cd frontend
-npm install
-npm run dev
+## Tech Stack
 
-Frontend runs on:
+### Frontend
 
-http://localhost:5173
-Environment Variables
+* React
+* Vercel Deployment
+* Monaco Editor
 
-Create a .env file inside the backend folder.
+### Backend
 
-Example:
+* FastAPI
+* Python
+* Render Deployment
 
-OPENAI_API_KEY=your_api_key
-Future Improvements
-Webcam proctoring
-AI emotion analysis
-Live coding execution
-Authentication system
-Interview analytics dashboard
-Database integration
-Cloud deployment
-Author
+### Database
 
-Developed by Eshan Gupta.
+* PostgreSQL (Neon)
+
+### AI Services
+
+* Groq API
+* Groq Whisper
+* Web Speech API
+
+## Architecture
+
+* Frontend deployed on Vercel
+* FastAPI backend deployed on Render
+* PostgreSQL database hosted on Neon
+* REST APIs for resume parsing, question generation, transcription, and evaluation
+
+## Live Demo
+
+Frontend: https://ai-mock-interviewer-modern.vercel.app/
+
+Backend API: https://ai-mock-interviewer-modern.onrender.com
+
+## Project Status
+
+Production-ready and fully deployed with separate frontend and backend infrastructure.
